@@ -1,0 +1,34 @@
+name: Build and release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PyInstaller
+        run: pip install pyinstaller==6.22.3
+      - name: Build single exe
+        run: pyinstaller --onefile --windowed --name ZmienAutora --distpath out ZmienAutora.py
+      - name: Build folder version (zip)
+        shell: pwsh
+        run: |
+          pyinstaller --onedir --windowed --name ZmienAutora --distpath outdir --workpath build2 ZmienAutora.py
+          Compress-Archive -Path outdir/ZmienAutora -DestinationPath out/ZmienAutora.zip
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "build-$env:GITHUB_RUN_NUMBER" }
+          gh release create $tag out/ZmienAutora.exe out/ZmienAutora.zip --title "ZmienAutora $tag" --notes "Pobierz ZmienAutora.exe i uruchom. Wersja .zip: rozpakuj i uruchom ZmienAutora.exe z folderu."
